@@ -1,0 +1,10 @@
+program
+main
+ //Komentarcina najjaca znas li
+ int a;
+ float b; 
+ b:= 0.532E+12;
+ bool c;
+ c:=false;
+ a:=356;
+exit
