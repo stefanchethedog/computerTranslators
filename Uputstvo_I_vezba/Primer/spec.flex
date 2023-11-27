@@ -52,6 +52,9 @@ bool = (true)|(false)
 , { return new Yytoken( sym.COMMA, yytext(), yyline, yycolumn ); }
 := { return new Yytoken( sym.ASSIGN, yytext(), yyline, yycolumn ); }
 
+\[ { return new Yytoken( sym.OPEN_SQUARE_BRACKET, yytext(), yyline, yycolumn );}
+\] { return new Yytoken( sym.CLOSED_SQUARE_BRACKET, yytext(), yyline, yycolumn);}
+
 //kljucne reci
 {slovo}+ { return getKW(); }
 

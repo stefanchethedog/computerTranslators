@@ -24,4 +24,5 @@ public class sym {
 	public final static int OPEN_SQUARE_BRACKET = 16;
 	public final static int CLOSED_SQUARE_BRACKET = 17;
 	public final static int APPLY = 18;
+	
 }

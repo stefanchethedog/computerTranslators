@@ -15,8 +15,6 @@ public class KWTable {
 		mTable.put("bool", new Integer(sym.BOOL));
 		mTable.put("for", new Integer(sym.FOR));
 		mTable.put("in", new Integer(sym.IN));
-		mTable.put('[', new Integer(sym.OPEN_SQUARE_BRACKET));
-		mTable.put(']', new Integer(sym.CLOSED_SQUARE_BRACKET));
 		mTable.put("apply", new Integer(sym.APPLY));
 	}
 	
