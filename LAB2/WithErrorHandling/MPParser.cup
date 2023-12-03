@@ -1,0 +1,204 @@
+//import sekcija
+
+import java_cup.runtime.*;
+import java.io.*;
+
+parser code {:
+	
+	public int errNo = 0;
+
+   public static void main( String[] args )
+   {
+      try
+	  {
+		   FileReader file = new FileReader( args[0] );
+		   Scanner scanner = new MPLexer( file );
+		   MPParser parser = new MPParser( scanner );
+		   parser.parse();
+		   if(parser.errNo == 0)
+		   		System.out.println("Analiza uspesno zavrsena");
+		   else
+		   		System.out.println("Analiza zavrsena, broj gresaka: " + parser.errNo);
+	  }
+	  catch( Exception e )
+	  {
+		   e.printStackTrace();
+	  }
+   }
+   
+   
+   public void syntax_error(Symbol cur_token)
+   {
+   }
+   
+   public void report_error(String message, Object info)
+   {
+   		System.out.print(message);
+   }
+   
+   public int getLine()
+   {
+   		return ((MPLexer) getScanner()).getLine();
+   }
+:};
+
+
+//Terminali
+terminal MAIN, EXIT, INT, FLOAT, BOOL, FOR, IN, APPLY;
+terminal ID, CONST, PLUS, MINUS, ASSIGN, SEMICOLON, COMMA, OPEN_SQUARE_BRACKET, CLOSED_SQUARE_BRACKET;
+
+//Neterminali
+non terminal Program, Block, Declarations, Declaration, Type, Expressions, Expression, Assignment, ArithmeticExpression;
+non terminal TermExpression, ApplyExpression, NameList;
+
+//Gramatika
+Program ::= MAIN Block EXIT 
+            {:
+               System.out.println( "Redukcija 1: Program ::= main Block exit" );
+            :};
+
+Block ::= Declarations Expressions
+             {:
+                System.out.println( "Redukcija 2: Block ::= Declarations Expressions" );
+             :};
+
+Declarations ::= Declarations Declaration
+            {:
+               System.out.println( "Redukcija 3: Declarations ::= Declarations Declaration" );
+            :}
+           | Declaration
+             {:
+                System.out.println( "Redukcija 4: Declarations ::= Declaration" );
+             :}
+          ;
+
+Declaration ::= Type ID SEMICOLON
+             {:
+                System.out.println( "Redukcija 5: Declaration ::= Type ID;" );
+             :}
+           ;
+
+Type ::= INT
+             {:
+                System.out.println( "Redukcija 6: Type ::= INT" );
+             :} 
+           | FLOAT
+             {:
+                System.out.println( "Redukcija 7: Type ::= FLOAT" );
+             :}
+           | BOOL
+           	 {:
+           	 	System.out.println( "Redukcija 8: Type ::= BOOL");
+           	 :}
+           ;
+
+Expressions ::= Expressions SEMICOLON Expression
+        {:
+           System.out.println( "Redukcija 8: Expressions ::= Expressions SEMICOLON EXPRESSION" );
+        :}
+      | Expression
+        {:
+           System.out.println( "Redukcija 9: Expressions ::= Expression" );
+        :}
+      | Expressions error
+        {:
+           System.out.println( "Error: Semicolon (;) missing in line: " + parser.getLine() );
+        :}
+      ;
+
+Expression ::= Assignment
+         {:
+            System.out.println( "Redukcija 10: Expression ::= Assignment" );
+         :}
+         | ApplyExpression
+         {:
+       		System.out.println("Redukcija 11: Expression ::= ApplyExpression" );  
+         :}
+       ;
+
+Assignment ::= ID ASSIGN ArithmeticExpression
+           {:
+              System.out.println( "Redukcija 12: Assignment ::= ID:= ArithmeticExpression" );
+           :}
+         ;
+
+ArithmeticExpression ::= ArithmeticExpression PLUS TermExpression
+            {:
+               System.out.println( "Redukcija 13: ArithmeticExpression ::= ArithmeticExpression + TermExpression" );
+            :}
+          | ArithmeticExpression MINUS TermExpression 
+            {:
+               System.out.println( "Redukcija 14: ArithmeticExpression ::= ArithmeticExpression - TermExpression" );
+            :}
+          | TermExpression
+          	{:
+          		System.out.println("Redukcija 15: ArithmeticExpression ::= TermExpression" );
+          	:}
+          ;
+
+TermExpression ::= CONST
+         	{:
+            	System.out.println( "Redukcija 16: TermExpression ::= CONST" );
+         	:} 
+         	| ID
+         	{:
+         		System.out.println("Redukcija 17: TermExpression ::= ID" );
+         	:}
+          ;
+
+ApplyExpression ::= FOR ID IN OPEN_SQUARE_BRACKET NameList CLOSED_SQUARE_BRACKET APPLY Expression
+          {:
+             System.out.println( "Redukcija 19: ApplyExp ::= for ID in [ NameList ] apply Expression" );
+          :}
+          | FOR ID IN OPEN_SQUARE_BRACKET NameList CLOSED_SQUARE_BRACKET APPLY error
+          {:
+             System.out.println( "Greska: nedostaje izraz/ Error: Expression missing after apply" + parser.getLine() );
+             parser.errNo++;
+          :}
+          | FOR ID IN OPEN_SQUARE_BRACKET NameList CLOSED_SQUARE_BRACKET error
+          {:
+             System.out.println( "Error: apply keyword expected" + parser.getLine() );
+             parser.errNo++;
+          :}
+          | FOR ID IN OPEN_SQUARE_BRACKET NameList error
+          {:
+             System.out.println( "Error: ] expected " + parser.getLine() );
+             parser.errNo++;
+          :}
+          | FOR ID IN OPEN_SQUARE_BRACKET error
+          {:
+             System.out.println( "Error: Expected NameList in form of: ID, ID, ..." + parser.getLine() );
+             parser.errNo++;
+          :}
+          | FOR ID IN error
+          {:
+             System.out.println( "Error: Expected [ " + parser.getLine() );
+             parser.errNo++;
+          :}
+          | FOR error
+          {:
+             System.out.println( "Error: for ID in [ <NameList> ] apply <Expression> " + parser.getLine() );
+             parser.errNo++;
+          :}
+          ;
+
+NameList ::= NameList COMMA ID
+           {:
+              System.out.println( "Redukcija 20: NameList ::= NameList, ID" );
+           :}
+           | ID
+           {:
+           	  System.out.println( "Redukcija 21: NameList ::= ID" );
+           :}
+           | NameList COMMA error
+           {:
+           		System.out.println( "Error: Identifier missing in line: " + parser.getLine() );
+           		parser.errNo++;
+           	:}
+           | NameList error
+           {:
+           		System.out.println( "Error: Comma missing in line: " + parser.getLine() );
+           		parser.errNo++;
+           :}
+          ;
+
