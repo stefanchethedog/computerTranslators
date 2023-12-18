@@ -1,0 +1,333 @@
+//import sekcija
+
+import java_cup.runtime.*;
+import java_cup.runtime.Scanner;
+import java.io.*;
+import java.util.*;
+
+import SymbolTable.*;
+
+parser code {:
+	SymbolTable symbolTable;
+	public int warnNo = 0;
+	public int errNo = 0;
+	
+   public static void main( String[] args )
+   {
+      try
+	  {
+		   FileReader file = new FileReader( args[0] );
+		   Scanner scanner = new MPLexer( file );
+		   MPParser parser = new MPParser( scanner );
+		   parser.parse();
+		   parser.checkWarnings();
+		   if ( parser.warnNo==0 && parser.errNo == 0)
+				 System.out.println(
+				"Analiza zavrsena. U kodu nema gresaka." );
+			 else{
+				 System.out.println(
+				 "Analiza zavrsena. Broj upozorenja: " +
+				 parser.warnNo );
+				 
+				 System.out.println("Broj gresaka: " + parser.errNo);
+			 }
+	  }
+	  catch( Exception e )
+	  {
+		   e.printStackTrace();
+	  }
+   }
+   
+   public int getLine()
+   {
+   		return ((MPLexer) getScanner()).getLine();
+   }
+   
+   public void checkWarnings()
+ 	{
+		 SymbolNode current = symbolTable.getVariables();
+		 while ( current != null )
+		 {
+			 Variable var = ( Variable ) current;
+			 if ( var.last_def == -1 && var.last_use == -1 )
+			 {
+				 System.out.println("Upozorenje: Promenljiva "
+				+ var.name +
+				"je deklarisana, ali se ne koristi.");
+				 warnNo++;
+			 }
+			 else if ( var.last_def > var.last_use )
+			 {
+				 System.out.println(
+				 "Upozorenje: Vrednost dodeljena prom. "
+				+ var.name + " u liniji " + var.last_def +
+				" se nigde ne koristi." );
+				 warnNo++;
+			 }
+			 current = current.next;
+		}
+ }  
+:};
+
+init with {:
+ 	symbolTable = new SymbolTable();
+:} 
+
+
+//Terminali
+terminal MAIN, EXIT, INT, FLOAT, BOOL, FOR, IN, APPLY;
+terminal PLUS, MINUS, ASSIGN, SEMICOLON, COMMA, OPEN_SQUARE_BRACKET, CLOSED_SQUARE_BRACKET;
+
+terminal String ID;
+terminal Integer INTCONST;
+terminal Boolean BOOLEANCONST;
+terminal Float FLOATCONST;
+
+
+//Neterminali
+non terminal Program, Block, Declarations, Declaration, Expressions, Expression;
+
+non terminal Type Tip, ArithmeticExpression, TermExpression, ApplyExpression, Assignment;
+non terminal ArrayList NameList;
+
+//Gramatika
+Program ::= MAIN Block EXIT 
+            {:
+               System.out.println( "Redukcija 1: Program ::= main Block exit" );
+            :};
+
+Block ::= Declarations Expressions
+             {:
+                System.out.println( "Redukcija 2: Block ::= Declarations Expressions" );
+             :};
+
+Declarations ::= Declarations Declaration
+            {:
+               System.out.println( "Redukcija 3: Declarations ::= Declarations Declaration" );
+            :}
+           | Declaration
+             {:
+                System.out.println( "Redukcija 4: Declarations ::= Declaration" );
+             :}
+          ;
+
+Declaration ::= Tip:t ID:id SEMICOLON
+             {:
+                if(!parser.symbolTable.addVar(id,t)){
+                	System.out.println("Promenjiva " + id + " je vec deklarisana.");
+                	parser.errNo++;
+                }
+             :}
+           ;
+
+Tip ::= INT
+             {:
+                RESULT = parser.symbolTable.getType("integer");
+             :} 
+           | FLOAT
+             {:
+				RESULT = parser.symbolTable.getType("float");
+             :}
+           | BOOL
+           	 {:
+           	 	RESULT = parser.symbolTable.getType("boolean");
+           	 :}
+           ;
+
+Expressions ::= Expressions SEMICOLON Expression
+        {:
+           System.out.println( "Redukcija 8: Expressions ::= Expressions SEMICOLON EXPRESSION" );
+        :}
+      | Expression
+        {:
+           System.out.println( "Redukcija 9: Expressions ::= Expression" );
+        :}
+      ;
+
+Expression ::= Assignment
+         {:
+            System.out.println( "Redukcija 10: Expression ::= Assignment" );
+         :}
+         | ApplyExpression
+         {:
+       		System.out.println("Redukcija 11: Expression ::= ApplyExpression" );  
+         :}
+       ;
+
+Assignment ::= ID:ime ASSIGN ArithmeticExpression:i
+           {:
+              Variable var = parser.symbolTable.getVar(ime);
+              
+              if(var == null){
+              	RESULT = parser.symbolTable.getType("unknown");
+              	System.out.println("Unknown type in line: " + parser.getLine());
+              	parser.errNo++;
+              }else{           
+	              int t = var.type.tkind;
+	              
+	              if(t == i.tkind){
+	              	if(i.tkind == Type.INTEGER){
+	              		RESULT = parser.symbolTable.getType("integer");
+	              		var.last_def = parser.getLine();
+	              	}else if(i.tkind == Type.FLOAT){
+	              		RESULT = parser.symbolTable.getType("float");
+	              		var.last_def = parser.getLine();
+	              		
+	              	}else if(i.tkind == Type.BOOLEAN){
+	              		RESULT = parser.symbolTable.getType("boolean");
+	              		var.last_def = parser.getLine();
+	              	}else{
+	              		RESULT = parser.symbolTable.getType("unknown");
+	              		System.out.println("Unknown type in line: " + parser.getLine());
+	              		parser.errNo++;
+	              	}	
+	              }else{
+	              	if(t == Type.FLOAT && i.tkind == Type.INTEGER){
+	              		RESULT = parser.symbolTable.getType("float");
+	              		var.last_def = parser.getLine();
+	              	}else{
+	              		RESULT = parser.symbolTable.getType("unknown");
+	              		System.out.println("Types missmatch in line: " + parser.getLine());
+	              		parser.errNo++;
+	              	}
+	              }
+              }
+           :}
+         ;
+
+ArithmeticExpression ::= ArithmeticExpression: i1 PLUS TermExpression: i2
+            {:
+              	if( i1.tkind == Type.INTEGER && i2.tkind == Type.INTEGER){
+              		RESULT = parser.symbolTable.getType("integer");
+              	}else if(i1.tkind == Type.FLOAT && (i2.tkind == Type.FLOAT || i2.tkind == Type.INTEGER)){
+              		RESULT = parser.symbolTable.getType("float");
+              	}else if(i2.tkind == Type.FLOAT && (i1.tkind == Type.FLOAT || i1.tkind == Type.INTEGER)){
+              		RESULT = parser.symbolTable.getType("float");
+              	}else{
+              		System.out.println("Nije moguce sabrati operande zbog neslaganja tipova u liniji: " + parser.getLine());
+              		RESULT = parser.symbolTable.getType("unknown");
+              		parser.errNo++;
+              	}
+            :}
+          | ArithmeticExpression:i1 MINUS TermExpression:i2
+            {:
+              if( i1.tkind == Type.INTEGER && i2.tkind == Type.INTEGER){
+              		RESULT = parser.symbolTable.getType("integer");
+              	}else if(i1.tkind == Type.FLOAT && (i2.tkind == Type.FLOAT || i2.tkind == Type.INTEGER)){
+              		RESULT = parser.symbolTable.getType("float");
+              	}else if(i2.tkind == Type.FLOAT && (i1.tkind == Type.FLOAT || i1.tkind == Type.INTEGER)){
+              		RESULT = parser.symbolTable.getType("float");
+              	}else{
+              		System.out.println("Nije moguce oduzeti operande zbog neslaganja tipova u liniji: " + parser.getLine());
+              		RESULT = parser.symbolTable.getType("unknown");
+              		parser.errNo++;
+              	}
+            :}
+          | TermExpression: i
+          	{:
+          		if (i.tkind == Type.INTEGER){
+          			RESULT = parser.symbolTable.getType("integer");
+          		}else if(i.tkind == Type.FLOAT){
+          			RESULT = parser.symbolTable.getType("float");
+          		}else {
+          			System.out.println("Greska prilikom dodele, linija: " + parser.getLine());
+          			parser.errNo++;
+          			RESULT = parser.symbolTable.getType("unknown");
+          		}
+          	:}
+          ;
+
+TermExpression ::= INTCONST
+         	{:
+            	RESULT = parser.symbolTable.getType("integer");
+         	:} 
+         	| FLOATCONST
+         	{:
+         		RESULT = parser.symbolTable.getType("float");
+         	:}
+         	| BOOLEANCONST
+         	{:
+         		RESULT = parser.symbolTable.getType("boolean");
+         	:}
+         	| ID: ime
+         	{:
+         		Variable var = parser.symbolTable.getVar(ime);
+         		if(var == null){
+         			System.out.println( "Ggreska u liniji " +
+						parser.getLine() +
+						 ": promenljiva " + ime +
+						" nije deklarisana.");
+					RESULT = parser.symbolTable.getType("unknown");
+					parser.errNo++;
+         		}else
+         		{
+         			RESULT = var.type;
+         			if(var.last_def == -1){
+         				System.out.println("Greska u liniji "
+							 + parser.getLine() +
+							 ": promenljiva " + ime + " nije inicijalizovana."); 
+         				parser.errNo++;
+         			}
+         			var.last_use = parser.getLine();
+         		}
+         	:}
+          ;
+
+ApplyExpression ::= FOR ID:ime IN OPEN_SQUARE_BRACKET NameList: niz CLOSED_SQUARE_BRACKET APPLY Expression
+          {:
+          	int t;
+          	if(niz.size() > 0){
+          		ime = (String)niz.get(0);
+          		t = parser.symbolTable.getVar(ime).type.tkind;
+          	
+	          	boolean nizPromenljivihBad = false;
+	          	boolean promenljivaBad = false;
+	          	
+	             for(int i = 0 ; i < niz.size(); i++){
+	              	String imeUNizu = (String) niz.get(i);
+	              	
+	              	Variable var = parser.symbolTable.getVar(ime);
+	              	Variable varNiz = parser.symbolTable.getVar(imeUNizu);
+	              	
+	              	if( var == null ){
+	              		System.out.println("Greska, promenjiva " +ime+ "nije deklarisana.");
+	              		parser.errNo++;
+	              	}else if(varNiz.type.tkind != var.type.tkind){
+	              		System.out.println("Tip promenjive" + ime + " se ne slaze sa tipom promenjivih iz niza NameList");
+	              		promenljivaBad = true;
+	              	}else if(varNiz.type.tkind != t){
+	              		System.out.println("Tipovi promenjivih u NameList-i " + niz + " nisu homogeni");
+	              		nizPromenljivihBad = true;
+	              	}	
+	              }
+	              
+	              if(nizPromenljivihBad || promenljivaBad){
+	              	RESULT = parser.symbolTable.getType("unknown");
+	              	parser.errNo++;
+	              }else{
+	              	if(t == Type.INTEGER){
+	              		RESULT = parser.symbolTable.getType("integer");
+	              	}else if(t == Type.FLOAT){
+	              		RESULT = parser.symbolTable.getType("float");
+	              	}else if(t == Type.BOOLEAN){
+	              		RESULT = parser.symbolTable.getType("boolean");
+	              	}else{
+	              		RESULT = parser.symbolTable.getType("unknown");
+	              	}
+	              }
+              }
+          :}
+          ;
+
+NameList ::= NameList:niz COMMA ID:ime
+           {:
+              RESULT = niz;
+              RESULT.add(ime);
+           :}
+           | ID: ime
+           {:
+           	  RESULT = new ArrayList();
+           	  RESULT.add(ime);
+           :}
+          ;
+
