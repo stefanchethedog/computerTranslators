@@ -1,0 +1,175 @@
+//import sekcija
+
+import java_cup.runtime.*;
+import java_cup.runtime.*;
+import java.io.*;
+import java.util.*;
+
+import SymbolTable.*;
+import AST.*;
+
+parser code {:
+ 
+   SymbolTable symbolTable;
+   
+:};
+
+init with {:
+	symbolTable = new SymbolTable();
+:}
+
+
+
+//Terminali
+terminal MAIN, EXIT, INT, FLOAT, BOOL, FOR, IN, APPLY;
+terminal PLUS, MINUS, ASSIGN, SEMICOLON, COMMA, OPEN_SQUARE_BRACKET, CLOSED_SQUARE_BRACKET;
+
+terminal String ID;
+terminal Integer INTCONST;
+terminal Boolean BOOLEANCONST;
+terminal Float FLOATCONST;
+
+
+//Neterminali
+non terminal Block Program, Blok;
+non terminal Expression Izraz, ArithmeticExp, TermExp;
+non terminal ApplyExpression ApplyExp;
+non terminal Assignment Dodela;
+non terminal Type Tip;
+
+
+non terminal ArrayList Expressions;
+non terminal ArrayList NameList;
+non terminal Declarations, Declaration;
+non terminal Constant Konstanta;
+
+//Gramatika
+Program ::= MAIN Blok: b EXIT 
+            {:
+               RESULT = b;
+            :};
+
+Blok ::= Declarations Expressions
+             {:
+                RESULT = new Block();
+             :};
+
+Declarations ::= Declarations Declaration
+            {:
+               System.out.println( "Redukcija 3: Declarations ::= Declarations Declaration" );
+            :}
+           | Declaration
+             {:
+                System.out.println( "Redukcija 4: Declarations ::= Declaration" );
+             :}
+          ;
+
+Declaration ::= Tip:t ID:id SEMICOLON
+             {:
+                if(!parser.symbolTable.addVar(id,t)){
+                	System.out.println("Promenjiva " + id + " je vec deklarisana.");
+                }
+             :}
+           ;
+
+Tip ::= INT
+             {:
+                RESULT = parser.symbolTable.getType("integer");
+             :} 
+           | FLOAT
+             {:
+				RESULT = parser.symbolTable.getType("float");
+             :}
+           | BOOL
+           	 {:
+           	 	RESULT = parser.symbolTable.getType("boolean");
+           	 :}
+           ;
+
+Expressions ::= Expressions: niz SEMICOLON Izraz: ime
+        {:
+           RESULT = niz;
+           niz.add(ime);
+        :}
+      | Izraz: ime
+        {:
+           RESULT = new ArrayList();
+           RESULT.add(ime);
+        :}
+      ;
+
+Izraz ::= Dodela: d
+         {:
+            RESULT = d;
+         :}
+         | ApplyExp: ae
+         {:
+       		RESULT = ae;
+         :}
+       ;
+
+Dodela ::= ID:ime ASSIGN ArithmeticExp:i
+           {:
+              Variable var = parser.symbolTable.getVar(ime);
+              
+              RESULT = new Assignment( var , i);
+           :}
+         ;
+
+ArithmeticExp ::= ArithmeticExp: i1 PLUS TermExp: i2
+            {:
+              	RESULT = new Sum(i1, i2);
+            :}
+          | ArithmeticExp:i1 MINUS TermExp:i2
+            {:
+                RESULT = new Difference(i1,i2);
+            :}
+          | TermExp: i
+          	{:
+          		RESULT = i;
+          	:}
+          ;
+          
+Konstanta ::= INTCONST:c
+         	{:
+            	RESULT = new Constant(parser.symbolTable.getType("integer"), c);
+         	:} 
+         	| FLOATCONST:c
+         	{:
+         		RESULT = new Constant( parser.symbolTable.getType("float"), c);
+         	:}
+         	| BOOLEANCONST:c
+         	{:
+         		RESULT = new Constant( parser.symbolTable.getType("boolean"), c);
+         	:}
+         ;
+
+TermExp ::= ID: ime
+         	{:
+         		Variable var = parser.symbolTable.getVar(ime);
+         		RESULT = new VariableExpression(var);
+         	:}
+         	| Konstanta:k
+         	{:
+         		RESULT = new ConstantExpression(k);
+         	:}
+          ;
+
+ApplyExp ::= FOR ID:id IN OPEN_SQUARE_BRACKET NameList: niz CLOSED_SQUARE_BRACKET APPLY Izraz:i
+          {:
+          		RESULT = new ApplyExpression(niz, i);
+          :}
+          ;
+
+NameList ::= NameList:niz COMMA ID:ime
+           {:
+              RESULT = niz;
+              RESULT.add(ime);
+           :}
+           | ID: ime
+           {:
+           	  RESULT = new ArrayList();
+           	  RESULT.add(ime);
+           :}
+          ;
+
